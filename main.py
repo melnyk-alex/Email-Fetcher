@@ -8,12 +8,19 @@ import email.header
 import datetime
 import re
 import sys
+import os
+
+rows, columns = os.popen('stty size', 'r').read().split()
 
 OUT_FILE = "emails.txt"
 MAX_FETCH = 0
 EMAIL_FOLDER = "INBOX"
 
 regex = re.compile('(.*)\s+<([^>]*)>.*')
+
+def clear_console():
+    sys.stdout.write("\r" + " " * int(columns))
+    sys.stdout.flush()
 
 def process_mailbox(M):
     rv, data = M.search(None, "ALL")
@@ -24,44 +31,46 @@ def process_mailbox(M):
     contacts = {}
 
     i = 0
-
-    for num in data[0].split():
-        i += 1
+    
+    with open(OUT_FILE, 'w+') as f:
+        for num in data[0].split():
+            i += 1
         
-        rv, data = M.fetch(num, '(RFC822)')
-        if rv != 'OK':
-            print("ERROR getting message", num)
-            return
+            rv, data = M.fetch(num, '(RFC822)')
+            if rv != 'OK':
+                print("ERROR getting message", num)
+                return
 
-        msg = email.message_from_string(data[0][1])
-        mailer = str(email.header.decode_header(msg['From'])[0][0])
+            msg = email.message_from_string(data[0][1])
+            mailer = str(email.header.decode_header(msg['From'])[0][0])
         
-        match = regex.match(mailer)
+            match = regex.match(mailer)
+            
+            clear_console()
+            
+            sys.stdout.write("\rFound contacts: [all: {0}; uniq: {1}]".format(i, len(contacts)))
 
-        sys.stdout.write("\r" + " " * 60)
-        sys.stdout.flush()
-        sys.stdout.write("\rFound contacts: [all: {0}; uniq: {1}]".format(i, len(contacts)))
+            if match:
+                found = match.group(2)
+                if found not in contacts:
+                    contacts.update({ found: match.group(1) })
+                    sys.stdout.write(" found: {0}".format(found))
+                
+                    f.write(found + "\r\n")
+                    f.flush()
 
-        if match:
-            found = match.group(2)
-            if found not in contacts:
-                contacts.update({ found: match.group(1) })
-                sys.stdout.write(" found: {0}".format(found))
+            sys.stdout.flush()
 
-        sys.stdout.flush()
-
-        if MAX_FETCH > 0 and i >= MAX_FETCH:
-            break
-
-    print("\nWriting file \"{0}\" ...".format(OUT_FILE))
-    with open(OUT_FILE, 'w') as f:
-        for e, n in contacts.iteritems():
-            f.write(e+"\r\n")
+            if MAX_FETCH > 0 and i >= MAX_FETCH:
+                break
+    
+    clear_console()
+    print("Scanning complete!")
 
 M = imaplib.IMAP4_SSL('imap.gmail.com')
 
 try:
-    username = raw_input("Enter account name: ")
+    username = raw_input("E-mail: ")
     rv, data = M.login(username, getpass.getpass())
 except imaplib.IMAP4.error:
     print("LOGIN FAILED!!! ")
