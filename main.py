@@ -69,23 +69,28 @@ def process_mailbox(M):
 
 M = imaplib.IMAP4_SSL('imap.gmail.com')
 
-try:
-    username = raw_input("E-mail: ")
-    rv, data = M.login(username, getpass.getpass())
-except imaplib.IMAP4.error:
-    print("LOGIN FAILED!!! ")
-    sys.exit(1)
+success = False
 
-print(rv, data)
+for x in range(3):
+    try:
+        username = raw_input("E-mail: ")
+        rv, data = M.login(username, getpass.getpass())
+        success = True
+        break
+    except imaplib.IMAP4.error:
+        print("LOGIN FAILED!!! ")
 
-MAX_FETCH = int(raw_input("Maximum fetch emails (ALL): ") or '0')
+if success:
+    print(rv, data)
 
-rv, data = M.select(EMAIL_FOLDER)
-if rv == 'OK':
-    print("Processing mailbox:")
-    process_mailbox(M)
-    M.close()
-else:
-    print("ERROR: Unable to open mailbox ", rv)
+    MAX_FETCH = int(raw_input("Maximum fetch emails (ALL): ") or '0')
+
+    rv, data = M.select(EMAIL_FOLDER)
+    if rv == 'OK':
+        print("Processing mailbox:")
+        process_mailbox(M)
+        M.close()
+    else:
+        print("ERROR: Unable to open mailbox ", rv)
 
 M.logout()
